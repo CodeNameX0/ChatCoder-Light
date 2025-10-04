@@ -147,7 +147,8 @@ class SimpleChatApp {
         const token = document.getElementById('loginToken').value;
 
         try {
-            const response = await fetch('/api/auth/login', {
+            const base = (window.APP_CONFIG && window.APP_CONFIG.API_BASE) || '';
+            const response = await fetch(base + '/api/auth/login', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -185,7 +186,8 @@ class SimpleChatApp {
         const token = document.getElementById('signupToken').value;
 
         try {
-            const response = await fetch('/api/auth/register', {
+            const base = (window.APP_CONFIG && window.APP_CONFIG.API_BASE) || '';
+            const response = await fetch(base + '/api/auth/register', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -220,7 +222,8 @@ class SimpleChatApp {
             this.socket.disconnect();
         }
 
-        this.socket = io({
+        const socketUrl = (window.APP_CONFIG && window.APP_CONFIG.SOCKET_URL) || undefined;
+        this.socket = io(socketUrl, {
             auth: {
                 token: this.token
             }
@@ -258,7 +261,8 @@ class SimpleChatApp {
 
     async loadRecentMessages() {
         try {
-            const response = await fetch('/api/messages', {
+            const base = (window.APP_CONFIG && window.APP_CONFIG.API_BASE) || '';
+            const response = await fetch(base + '/api/messages', {
                 headers: {
                     'Authorization': `Bearer ${this.token}`
                 }
