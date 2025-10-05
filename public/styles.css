@@ -437,6 +437,32 @@ body {
         border-radius: 0;
     }
     
+    .chat-header {
+        padding: 15px 20px;
+        flex-wrap: wrap;
+        gap: 10px;
+    }
+    
+    .chat-header h1 {
+        font-size: 1.3rem;
+        flex: 1;
+        min-width: 0;
+    }
+    
+    .header-info {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex-shrink: 0;
+        margin-right: 60px; /* 테마 토글 버튼 공간 확보 */
+    }
+    
+    .logout-btn {
+        padding: 6px 10px;
+        font-size: 0.9rem;
+        white-space: nowrap;
+    }
+    
     .message {
         max-width: 85%;
     }
@@ -446,5 +472,12 @@ body {
         height: 45px;
         top: 15px;
         right: 15px;
+    }
+    
+    .install-btn {
+        top: 70px;
+        right: 15px;
+        width: 45px;
+        height: 45px;
     }
 }
