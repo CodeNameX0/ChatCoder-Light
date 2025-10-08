@@ -1,0 +1,24 @@
+compatibility_date = "2023-10-01"
+compatibility_flags = ["nodejs_compat"]
+
+[build]
+command = "npm run build"
+publish = "public"
+
+[[redirects]]
+from = "/api/*"
+to = "/functions/api/:splat"
+status = 200
+
+[[headers]]
+for = "/*"
+[headers.values]
+X-Frame-Options = "DENY"
+X-Content-Type-Options = "nosniff"
+X-XSS-Protection = "1; mode=block"
+Referrer-Policy = "strict-origin-when-cross-origin"
+
+[[headers]]
+for = "/assets/*"
+[headers.values]
+Cache-Control = "public, max-age=31536000, immutable"
