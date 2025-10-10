@@ -1,19 +1,29 @@
 name = "chatcoder-light"
-compatibility_date = "2024-01-01"
-pages_build_output_dir = "public"
+compatibility_date = "2023-10-30"
+compatibility_flags = ["nodejs_compat"]
 
 [env.production]
-compatibility_date = "2024-01-01"
-
-[[env.production.kv_namespaces]]
-binding = "CHAT_KV"
-id = "your-kv-namespace-id-here"
-preview_id = "your-preview-kv-namespace-id-here"
-
-[build]
-command = "npm run build"
-cwd = ""
-watch_dir = "public"
+name = "chatcoder-light-prod"
 
 [vars]
 NODE_ENV = "production"
+SIGNUP_TOKEN = "your-signup-token-here"
+JWT_SECRET = "your-super-secret-jwt-key"
+
+# MongoDB Atlas Data API 설정
+MONGODB_DATA_API_URL = "https://data.mongodb-api.com/app/your-app-id/endpoint/data/v1"
+MONGODB_API_KEY = "your-mongodb-api-key"
+MONGODB_CLUSTER = "cluster0" 
+MONGODB_DATABASE = "chatcoder"
+
+[env.production.vars]
+NODE_ENV = "production"
+DOMAIN = "code-nex.store"
+SIGNUP_TOKEN = "your-production-signup-token"
+JWT_SECRET = "your-production-jwt-secret"
+
+# Production MongoDB Atlas Data API 설정
+MONGODB_DATA_API_URL = "https://data.mongodb-api.com/app/your-app-id/endpoint/data/v1"
+MONGODB_API_KEY = "your-production-mongodb-api-key"
+MONGODB_CLUSTER = "cluster0"
+MONGODB_DATABASE = "chatcoder"

@@ -75,26 +75,6 @@ body {
     font-size: 1rem;
 }
 
-.cloudflare-notice {
-    background: linear-gradient(45deg, #f38020, #f5821f);
-    color: white !important;
-    padding: 8px 12px;
-    border-radius: 20px;
-    font-size: 0.85rem !important;
-    font-weight: 600;
-    margin-top: 10px !important;
-    opacity: 1 !important;
-}
-
-.connection-status {
-    background: var(--success-color);
-    color: white;
-    padding: 4px 8px;
-    border-radius: 12px;
-    font-size: 0.8rem;
-    font-weight: 600;
-}
-
 .auth-form {
     display: none;
 }
