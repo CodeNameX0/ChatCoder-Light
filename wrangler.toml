@@ -1,0 +1,19 @@
+name = "chatcoder-light"
+compatibility_date = "2024-01-01"
+pages_build_output_dir = "public"
+
+[env.production]
+compatibility_date = "2024-01-01"
+
+[[env.production.kv_namespaces]]
+binding = "CHAT_KV"
+id = "your-kv-namespace-id-here"
+preview_id = "your-preview-kv-namespace-id-here"
+
+[build]
+command = "npm run build"
+cwd = ""
+watch_dir = "public"
+
+[vars]
+NODE_ENV = "production"
