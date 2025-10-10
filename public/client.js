@@ -1,9 +1,11 @@
-class SimpleChatApp {
+// CloudFlare Pages용 채팅 클라이언트 (Socket.IO 없이 polling 방식)
+class CloudflareSimpleChatApp {
     constructor() {
-        this.socket = null;
         this.currentUser = null;
         this.token = null;
         this.deferredPrompt = null;
+        this.pollingInterval = null;
+        this.lastMessageId = 0;
         
         this.initializeServiceWorker();
         this.initializeEventListeners();
@@ -18,7 +20,6 @@ class SimpleChatApp {
                 const registration = await navigator.serviceWorker.register('/sw.js');
                 console.log('Service Worker 등록 성공:', registration);
                 
-                // 푸시 알림 권한 요청
                 if ('Notification' in window && Notification.permission === 'default') {
                     await Notification.requestPermission();
                 }
@@ -51,318 +52,290 @@ class SimpleChatApp {
         window.addEventListener('beforeinstallprompt', (e) => {
             e.preventDefault();
             this.deferredPrompt = e;
-            // 이미 설치된 상태가 아니면 버튼 표시
-            if (!this.isAppInstalled()) {
-                document.getElementById('installBtn').classList.remove('hidden');
-            }
-            console.log('beforeinstallprompt 이벤트 감지됨');
+            document.getElementById('installBtn').classList.remove('hidden');
         });
 
-        // 앱 설치 완료 이벤트
-        window.addEventListener('appinstalled', () => {
-            console.log('PWA 설치 완료');
-            this.deferredPrompt = null;
-            document.getElementById('installBtn').classList.add('hidden');
-            this.showToast('ChatCoder Light 설치 완료!', 'success');
-        });
-
-        // 페이지 로드시 설치 상태에 따라 버튼 상태 동기화
-        window.addEventListener('load', () => {
-            if (this.isAppInstalled()) {
-                document.getElementById('installBtn').classList.add('hidden');
-            }
-            // iOS는 beforeinstallprompt가 없어 가이드 제공
-            if (this.isIOS() && !this.isAppInstalled()) {
-                this.showToast('iOS에서는 Safari 공유 메뉴 > 홈 화면에 추가로 설치하세요.', 'warning');
+        // Enter 키로 메시지 전송
+        document.getElementById('messageInput').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                this.handleSendMessage(e);
             }
         });
+    }
 
-        // display-mode 변경 시 버튼 상태 갱신
-        const mq = window.matchMedia('(display-mode: standalone)');
-        const onChange = (e) => {
-            if (e.matches) {
-                document.getElementById('installBtn').classList.add('hidden');
-            }
+    // API 요청 함수
+    async apiRequest(endpoint, options = {}) {
+        const baseUrl = window.APP_CONFIG?.API_BASE || '';
+        const url = `${baseUrl}/api/${endpoint}`;
+        
+        const defaultOptions = {
+            headers: {
+                'Content-Type': 'application/json',
+            },
         };
-        if (mq.addEventListener) mq.addEventListener('change', onChange);
-        else if (mq.addListener) mq.addListener(onChange);
+
+        if (this.token) {
+            defaultOptions.headers['Authorization'] = `Bearer ${this.token}`;
+        }
+
+        try {
+            const response = await fetch(url, { ...defaultOptions, ...options });
+            const data = await response.json();
+            
+            if (!response.ok) {
+                throw new Error(data.error || '요청 처리 중 오류가 발생했습니다');
+            }
+            
+            return data;
+        } catch (error) {
+            console.error('API 요청 오류:', error);
+            throw error;
+        }
     }
 
-    isIOS() {
-        return /iphone|ipad|ipod/i.test(window.navigator.userAgent);
-    }
-
-    isAppInstalled() {
-        const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
-        const isIOSStandalone = window.navigator.standalone === true; // iOS Safari
-        return isStandalone || isIOSStandalone;
-    }
-
+    // 테마 초기화
     initializeTheme() {
-        const savedTheme = localStorage.getItem('simple-chat-theme') || 'light';
+        const savedTheme = localStorage.getItem('chatcoder-theme') || 'light';
         document.documentElement.setAttribute('data-theme', savedTheme);
         this.updateThemeIcon(savedTheme);
     }
 
-    toggleTheme() {
-        const currentTheme = document.documentElement.getAttribute('data-theme');
-        const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
-        document.documentElement.setAttribute('data-theme', newTheme);
-        localStorage.setItem('simple-chat-theme', newTheme);
-        this.updateThemeIcon(newTheme);
-    }
-
-    updateThemeIcon(theme) {
-        const icon = document.querySelector('#themeToggle i');
-        icon.className = theme === 'dark' ? 'fas fa-sun' : 'fas fa-moon';
-    }
-
+    // 기존 인증 확인
     checkExistingAuth() {
-        const token = localStorage.getItem('simple-chat-token');
-        const user = localStorage.getItem('simple-chat-user');
+        const token = localStorage.getItem('chatcoder-token');
+        const userData = localStorage.getItem('chatcoder-user');
         
-        if (token && user) {
-            this.token = token;
-            this.currentUser = JSON.parse(user);
-            this.connectSocket();
-            this.showChatInterface();
+        if (token && userData) {
+            try {
+                this.token = token;
+                this.currentUser = JSON.parse(userData);
+                this.showChatInterface();
+                this.startMessagePolling();
+            } catch (error) {
+                console.error('저장된 인증 정보 오류:', error);
+                this.clearAuthData();
+            }
         }
     }
 
+    // 회원가입 폼 표시
     showSignupForm() {
         document.getElementById('loginForm').classList.remove('active');
         document.getElementById('signupForm').classList.add('active');
     }
 
+    // 로그인 폼 표시
     showLoginForm() {
         document.getElementById('signupForm').classList.remove('active');
         document.getElementById('loginForm').classList.add('active');
     }
 
-    async handleLogin(e) {
-        e.preventDefault();
-        
-        const username = document.getElementById('loginUsername').value;
-        const password = document.getElementById('loginPassword').value;
-        const token = document.getElementById('loginToken').value;
-
-        try {
-            const base = (window.APP_CONFIG && window.APP_CONFIG.API_BASE) || '';
-            const response = await fetch(base + '/api/auth/login', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ username, password, token })
-            });
-
-            const data = await response.json();
-
-            if (!response.ok) {
-                throw new Error(data.error);
-            }
-
-            this.currentUser = data.user;
-            this.token = data.token;
-            
-            // 로컬 스토리지에 저장
-            localStorage.setItem('simple-chat-token', this.token);
-            localStorage.setItem('simple-chat-user', JSON.stringify(this.currentUser));
-
-            this.connectSocket();
-            this.showChatInterface();
-            this.showToast('로그인 성공!', 'success');
-
-        } catch (error) {
-            this.showToast(error.message, 'error');
-        }
-    }
-
+    // 회원가입 처리
     async handleSignup(e) {
         e.preventDefault();
         
-        const username = document.getElementById('signupUsername').value;
+        const username = document.getElementById('signupUsername').value.trim();
         const password = document.getElementById('signupPassword').value;
-        const token = document.getElementById('signupToken').value;
+        const confirmPassword = document.getElementById('signupConfirmPassword').value;
+        const token = document.getElementById('signupToken').value.trim();
+        
+        if (password !== confirmPassword) {
+            this.showToast('비밀번호가 일치하지 않습니다', 'error');
+            return;
+        }
 
         try {
-            const base = (window.APP_CONFIG && window.APP_CONFIG.API_BASE) || '';
-            const response = await fetch(base + '/api/auth/register', {
+            const data = await this.apiRequest('auth/signup', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ username, password, token })
+                body: JSON.stringify({ username, password, token }),
             });
 
-            const data = await response.json();
-
-            if (!response.ok) {
-                throw new Error(data.error);
-            }
-
-            this.currentUser = data.user;
             this.token = data.token;
+            this.currentUser = data.user;
             
             // 로컬 스토리지에 저장
-            localStorage.setItem('simple-chat-token', this.token);
-            localStorage.setItem('simple-chat-user', JSON.stringify(this.currentUser));
-
-            this.connectSocket();
+            localStorage.setItem('chatcoder-token', this.token);
+            localStorage.setItem('chatcoder-user', JSON.stringify(this.currentUser));
+            
+            this.showToast(data.message, 'success');
             this.showChatInterface();
-            this.showToast('회원가입 성공!', 'success');
-
+            this.startMessagePolling();
         } catch (error) {
             this.showToast(error.message, 'error');
         }
     }
 
-    connectSocket() {
-        if (this.socket) {
-            this.socket.disconnect();
-        }
+    // 로그인 처리
+    async handleLogin(e) {
+        e.preventDefault();
+        
+        const username = document.getElementById('loginUsername').value.trim();
+        const password = document.getElementById('loginPassword').value;
+        const token = document.getElementById('loginToken').value.trim();
 
-        const socketUrl = (window.APP_CONFIG && window.APP_CONFIG.SOCKET_URL) || undefined;
-        this.socket = io(socketUrl, {
-            auth: {
-                token: this.token
-            }
-        });
-
-        this.socket.on('connect', () => {
-            console.log('서버에 연결되었습니다');
-            this.loadRecentMessages();
-        });
-
-        this.socket.on('disconnect', () => {
-            console.log('서버 연결이 끊어졌습니다');
-        });
-
-        this.socket.on('new-message', (message) => {
-            this.displayMessage(message);
-        });
-
-        this.socket.on('user-joined', (data) => {
-            this.displaySystemMessage(data.message);
-        });
-
-        this.socket.on('user-left', (data) => {
-            this.displaySystemMessage(data.message);
-        });
-
-        this.socket.on('online-count', (count) => {
-            document.getElementById('onlineCount').textContent = count;
-        });
-
-        this.socket.on('error', (data) => {
-            this.showToast(data.message, 'error');
-        });
-    }
-
-    async loadRecentMessages() {
         try {
-            const base = (window.APP_CONFIG && window.APP_CONFIG.API_BASE) || '';
-            const response = await fetch(base + '/api/messages', {
-                headers: {
-                    'Authorization': `Bearer ${this.token}`
-                }
+            const data = await this.apiRequest('auth/login', {
+                method: 'POST',
+                body: JSON.stringify({ username, password, token }),
             });
 
-            if (response.ok) {
-                const messages = await response.json();
-                const messagesList = document.getElementById('messagesList');
-                messagesList.innerHTML = '';
-                
-                messages.forEach(message => {
-                    this.displayMessage(message, false);
-                });
-                
-                this.scrollToBottom();
-            }
+            this.token = data.token;
+            this.currentUser = data.user;
+            
+            // 로컬 스토리지에 저장
+            localStorage.setItem('chatcoder-token', this.token);
+            localStorage.setItem('chatcoder-user', JSON.stringify(this.currentUser));
+            
+            this.showToast(data.message, 'success');
+            this.showChatInterface();
+            this.startMessagePolling();
         } catch (error) {
-            console.error('메시지 로드 실패:', error);
+            this.showToast(error.message, 'error');
         }
     }
 
-    handleSendMessage(e) {
+    // 메시지 전송 처리
+    async handleSendMessage(e) {
         e.preventDefault();
         
         const messageInput = document.getElementById('messageInput');
         const content = messageInput.value.trim();
         
-        if (content && this.socket) {
-            this.socket.emit('send-message', { content });
+        if (!content) return;
+
+        try {
+            await this.apiRequest('messages', {
+                method: 'POST',
+                body: JSON.stringify({ content }),
+            });
+
             messageInput.value = '';
+            // 메시지 폴링을 즉시 실행하여 새 메시지 표시
+            this.pollMessages();
+        } catch (error) {
+            this.showToast('메시지 전송 실패: ' + error.message, 'error');
         }
     }
 
-    displayMessage(message, autoScroll = true) {
+    // 메시지 polling 시작
+    startMessagePolling() {
+        // 기존 폴링 중지
+        if (this.pollingInterval) {
+            clearInterval(this.pollingInterval);
+        }
+
+        // 즉시 메시지 로드
+        this.pollMessages();
+        
+        // 2초마다 새 메시지 확인
+        this.pollingInterval = setInterval(() => {
+            this.pollMessages();
+        }, 2000);
+    }
+
+    // 메시지 조회
+    async pollMessages() {
+        try {
+            const data = await this.apiRequest('messages');
+            this.displayMessages(data.messages);
+        } catch (error) {
+            console.error('메시지 조회 실패:', error);
+        }
+    }
+
+    // 메시지 표시
+    displayMessages(messages) {
         const messagesList = document.getElementById('messagesList');
-        const messageElement = document.createElement('div');
-        
-        const isOwnMessage = message.username === this.currentUser.username;
-        messageElement.className = `message ${isOwnMessage ? 'own' : 'other'}`;
-        
-        const timestamp = new Date(message.timestamp).toLocaleTimeString('ko-KR', {
-            hour: '2-digit',
-            minute: '2-digit'
+        messagesList.innerHTML = '';
+
+        messages.forEach(message => {
+            const messageElement = document.createElement('div');
+            messageElement.className = `message ${message.username === this.currentUser.username ? 'own' : 'other'}`;
+            
+            const timestamp = new Date(message.timestamp).toLocaleTimeString();
+            
+            messageElement.innerHTML = `
+                <div class="message-header">${message.username} • ${timestamp}</div>
+                <div class="message-content">${this.escapeHtml(message.content)}</div>
+            `;
+            
+            messagesList.appendChild(messageElement);
         });
 
-        messageElement.innerHTML = `
-            <div class="message-header">
-                ${isOwnMessage ? '나' : message.username} • ${timestamp}
-            </div>
-            <div class="message-content">
-                ${this.escapeHtml(message.content)}
-            </div>
-        `;
-
-        messagesList.appendChild(messageElement);
-        
-        if (autoScroll) {
-            this.scrollToBottom();
-        }
+        // 스크롤을 맨 아래로
+        messagesList.scrollTop = messagesList.scrollHeight;
     }
 
-    displaySystemMessage(content) {
-        const messagesList = document.getElementById('messagesList');
-        const messageElement = document.createElement('div');
-        messageElement.className = 'system-message';
-        messageElement.textContent = content;
-        messagesList.appendChild(messageElement);
-        this.scrollToBottom();
+    // HTML 이스케이프
+    escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
     }
 
-    scrollToBottom() {
-        const messagesContainer = document.querySelector('.messages-container');
-        messagesContainer.scrollTop = messagesContainer.scrollHeight;
-    }
-
+    // 채팅 인터페이스 표시
     showChatInterface() {
         document.getElementById('authContainer').classList.add('hidden');
         document.getElementById('chatContainer').classList.remove('hidden');
     }
 
-    showAuthInterface() {
+    // 로그아웃 처리
+    handleLogout() {
+        this.clearAuthData();
+        
+        // 폴링 중지
+        if (this.pollingInterval) {
+            clearInterval(this.pollingInterval);
+            this.pollingInterval = null;
+        }
+
         document.getElementById('chatContainer').classList.add('hidden');
         document.getElementById('authContainer').classList.remove('hidden');
-    }
-
-    handleLogout() {
-        if (this.socket) {
-            this.socket.disconnect();
-        }
         
-        localStorage.removeItem('simple-chat-token');
-        localStorage.removeItem('simple-chat-user');
-        
-        this.currentUser = null;
-        this.token = null;
-        
-        this.showAuthInterface();
         this.showToast('로그아웃되었습니다', 'success');
     }
 
+    // 인증 데이터 삭제
+    clearAuthData() {
+        this.token = null;
+        this.currentUser = null;
+        localStorage.removeItem('chatcoder-token');
+        localStorage.removeItem('chatcoder-user');
+    }
+
+    // 테마 토글
+    toggleTheme() {
+        const currentTheme = document.documentElement.getAttribute('data-theme');
+        const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+        
+        document.documentElement.setAttribute('data-theme', newTheme);
+        localStorage.setItem('chatcoder-theme', newTheme);
+        this.updateThemeIcon(newTheme);
+    }
+
+    // 테마 아이콘 업데이트
+    updateThemeIcon(theme) {
+        const themeIcon = document.querySelector('#themeToggle i');
+        themeIcon.className = theme === 'dark' ? 'fas fa-sun' : 'fas fa-moon';
+    }
+
+    // PWA 설치
+    async handleInstall() {
+        if (!this.deferredPrompt) return;
+
+        this.deferredPrompt.prompt();
+        const { outcome } = await this.deferredPrompt.userChoice;
+        
+        if (outcome === 'accepted') {
+            this.showToast('앱이 설치되었습니다', 'success');
+        }
+        
+        this.deferredPrompt = null;
+        document.getElementById('installBtn').classList.add('hidden');
+    }
+
+    // 토스트 알림 표시
     showToast(message, type = 'info') {
         const toastContainer = document.getElementById('toastContainer');
         const toast = document.createElement('div');
@@ -371,42 +344,14 @@ class SimpleChatApp {
         
         toastContainer.appendChild(toast);
         
+        // 3초 후 자동 제거
         setTimeout(() => {
             toast.remove();
         }, 3000);
-    }
-
-    // PWA 설치 처리
-    async handleInstall() {
-        if (this.deferredPrompt) {
-            this.deferredPrompt.prompt();
-            const { outcome } = await this.deferredPrompt.userChoice;
-            
-            if (outcome === 'accepted') {
-                this.showToast('ChatCoder Light 설치 완료!', 'success');
-            }
-            
-            this.deferredPrompt = null;
-            document.getElementById('installBtn').classList.add('hidden');
-        } else {
-            // iOS 또는 프롬프트 미발생 케이스 안내
-            if (this.isIOS()) {
-                this.showToast('iOS: Safari 공유 메뉴에서 홈 화면에 추가를 사용하세요.', 'warning');
-            } else {
-                this.showToast('설치 프롬프트를 표시할 수 없습니다. 잠시 후 다시 시도하세요.', 'warning');
-                console.log('deferredPrompt가 없어 설치 프롬프트를 표시할 수 없습니다.');
-            }
-        }
-    }
-
-    escapeHtml(text) {
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
     }
 }
 
 // 앱 초기화
 document.addEventListener('DOMContentLoaded', () => {
-    new SimpleChatApp();
+    window.chatApp = new CloudflareSimpleChatApp();
 });
