@@ -6,11 +6,22 @@ class CloudflareSimpleChatApp {
         this.deferredPrompt = null;
         this.pollingInterval = null;
         this.lastMessageId = 0;
+        this.previousMessages = [];
+        this.notificationManager = null;
         
         this.initializeServiceWorker();
+        this.initializeNotifications();
         this.initializeEventListeners();
         this.initializeTheme();
         this.checkExistingAuth();
+    }
+
+    // 알림 매니저 초기화
+    initializeNotifications() {
+        // NotificationManager가 로드되었는지 확인
+        if (typeof NotificationManager !== 'undefined') {
+            this.notificationManager = new NotificationManager();
+        }
     }
 
     // Service Worker 등록
@@ -47,6 +58,9 @@ class CloudflareSimpleChatApp {
         
         // PWA 설치
         document.getElementById('installBtn').addEventListener('click', () => this.handleInstall());
+        
+        // 알림 테스트
+        document.getElementById('notificationTestBtn').addEventListener('click', () => this.testNotification());
         
         // PWA 설치 프롬프트 감지
         window.addEventListener('beforeinstallprompt', (e) => {
@@ -247,6 +261,10 @@ class CloudflareSimpleChatApp {
     // 메시지 표시
     displayMessages(messages) {
         const messagesList = document.getElementById('messagesList');
+        
+        // 새 메시지 감지를 위해 이전 메시지와 비교
+        const newMessages = this.detectNewMessages(messages);
+        
         messagesList.innerHTML = '';
 
         messages.forEach(message => {
@@ -263,6 +281,12 @@ class CloudflareSimpleChatApp {
             messagesList.appendChild(messageElement);
         });
 
+        // 새 메시지에 대해 알림 발송
+        this.handleNewMessageNotifications(newMessages);
+        
+        // 이전 메시지 목록 업데이트
+        this.previousMessages = [...messages];
+
         // 스크롤을 맨 아래로
         messagesList.scrollTop = messagesList.scrollHeight;
     }
@@ -278,6 +302,9 @@ class CloudflareSimpleChatApp {
     showChatInterface() {
         document.getElementById('authContainer').classList.add('hidden');
         document.getElementById('chatContainer').classList.remove('hidden');
+        
+        // 로그인 후 알림 테스트 버튼 표시
+        document.getElementById('notificationTestBtn').classList.remove('hidden');
     }
 
     // 로그아웃 처리
@@ -292,6 +319,9 @@ class CloudflareSimpleChatApp {
 
         document.getElementById('chatContainer').classList.add('hidden');
         document.getElementById('authContainer').classList.remove('hidden');
+        
+        // 로그아웃 시 알림 테스트 버튼 숨기기
+        document.getElementById('notificationTestBtn').classList.add('hidden');
         
         this.showToast('로그아웃되었습니다', 'success');
     }
@@ -320,6 +350,26 @@ class CloudflareSimpleChatApp {
         themeIcon.className = theme === 'dark' ? 'fas fa-sun' : 'fas fa-moon';
     }
 
+    // 새 메시지 감지
+    detectNewMessages(currentMessages) {
+        if (!this.previousMessages || this.previousMessages.length === 0) {
+            return []; // 처음 로드시에는 알림 안함
+        }
+
+        const previousIds = new Set(this.previousMessages.map(msg => msg.id || msg.timestamp));
+        return currentMessages.filter(msg => !previousIds.has(msg.id || msg.timestamp));
+    }
+
+    // 새 메시지 알림 처리
+    handleNewMessageNotifications(newMessages) {
+        if (!this.notificationManager || !newMessages.length) return;
+
+        newMessages.forEach(message => {
+            const isOwnMessage = message.username === this.currentUser.username;
+            this.notificationManager.notifyNewMessage(message, isOwnMessage);
+        });
+    }
+
     // PWA 설치
     async handleInstall() {
         if (!this.deferredPrompt) return;
@@ -333,6 +383,16 @@ class CloudflareSimpleChatApp {
         
         this.deferredPrompt = null;
         document.getElementById('installBtn').classList.add('hidden');
+    }
+
+    // 알림 테스트
+    testNotification() {
+        if (this.notificationManager) {
+            this.notificationManager.testNotification();
+            this.showToast('알림 테스트가 실행되었습니다', 'success');
+        } else {
+            this.showToast('알림 기능이 초기화되지 않았습니다', 'error');
+        }
     }
 
     // 토스트 알림 표시

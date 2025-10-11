@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="ko">
 <head>
@@ -28,7 +29,6 @@
                 <h1>ChatCoder Light</h1>
                 <p>간단한 단체 채팅</p>
                 <p class="app-meta">제작자: <strong>CodeNameX0</strong> · 개발 날짜: <strong>2025.10.4</strong></p>
-                <p class="cloudflare-notice">🌟 Powered by Cloudflare Pages</p>
             </div>
             
             <!-- 로그인 폼 -->
@@ -49,11 +49,9 @@
                     </div>
                     <button type="submit" class="auth-btn primary">로그인</button>
                 </form>
-                <div class="auth-switch">
-                    계정이 없으신가요? <span id="showSignup">회원가입</span>
-                </div>
+                <p class="auth-switch">계정이 없으신가요? <span id="showSignup">회원가입</span></p>
             </div>
-
+            
             <!-- 회원가입 폼 -->
             <div id="signupForm" class="auth-form">
                 <h2>회원가입</h2>
@@ -67,18 +65,12 @@
                         <input type="password" id="signupPassword" placeholder="비밀번호" required>
                     </div>
                     <div class="input-group">
-                        <i class="fas fa-lock"></i>
-                        <input type="password" id="signupConfirmPassword" placeholder="비밀번호 확인" required>
-                    </div>
-                    <div class="input-group">
                         <i class="fas fa-key"></i>
                         <input type="text" id="signupToken" placeholder="토큰" required>
                     </div>
                     <button type="submit" class="auth-btn primary">회원가입</button>
                 </form>
-                <div class="auth-switch">
-                    이미 계정이 있으신가요? <span id="showLogin">로그인</span>
-                </div>
+                <p class="auth-switch">이미 계정이 있으신가요? <span id="showLogin">로그인</span></p>
             </div>
         </div>
     </div>
@@ -88,7 +80,7 @@
         <div class="chat-header">
             <h1>단체 채팅방</h1>
             <div class="header-info">
-                <span class="connection-status">🌐 Cloudflare</span>
+                <span id="onlineCount">0</span>명 접속중
                 <button id="logoutBtn" class="logout-btn" title="로그아웃">
                     <i class="fas fa-sign-out-alt"></i>
                 </button>
@@ -126,8 +118,15 @@
         <i class="fas fa-moon"></i>
     </button>
 
+    <!-- 알림 테스트 버튼 -->
+    <button id="notificationTestBtn" class="notification-test-btn hidden" title="알림 테스트">
+        <i class="fas fa-bell"></i>
+    </button>
+
     <!-- 스크립트 -->
+    <script src="/socket.io/socket.io.js"></script>
     <script src="config.js"></script>
-    <script src="client-cloudflare.js"></script>
+    <script src="notification-manager.js"></script>
+    <script src="client.js"></script>
 </body>
 </html>

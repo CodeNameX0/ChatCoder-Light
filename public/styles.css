@@ -383,6 +383,36 @@ body {
     display: none;
 }
 
+/* 알림 테스트 버튼 */
+.notification-test-btn {
+    position: fixed;
+    top: 140px;
+    right: 20px;
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    border: none;
+    background: var(--warning-color);
+    color: white;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.2rem;
+    box-shadow: var(--shadow);
+    transition: all 0.3s ease;
+    z-index: 1000;
+}
+
+.notification-test-btn:hover {
+    transform: scale(1.1);
+    background: #e67e22;
+}
+
+.notification-test-btn.hidden {
+    display: none;
+}
+
 /* Toast 알림 */
 .toast-container {
     position: fixed;
@@ -476,6 +506,13 @@ body {
     
     .install-btn {
         top: 70px;
+        right: 15px;
+        width: 45px;
+        height: 45px;
+    }
+    
+    .notification-test-btn {
+        top: 125px;
         right: 15px;
         width: 45px;
         height: 45px;
