@@ -1,7 +1,7 @@
 // Cloudflare Pages Functions - API 엔드포인트
-// 간소화된 MongoDB 연결을 사용한 백엔드 API
+// 메모리 기반 JSON 데이터베이스 사용
 
-import { CloudflareMongoClient } from '../../simple-mongo-client.js';
+import { MemoryDatabase } from '../../memory-database.js';
 import { CloudflareCrypto } from '../../cloudflare-crypto.js';
 
 // CORS 헤더 설정
@@ -30,7 +30,7 @@ export async function onRequest(context) {
   }
 
   try {
-    const db = new CloudflareMongoClient(env);
+    const db = new MemoryDatabase();
     
     // API 라우팅
     switch (path) {
@@ -230,11 +230,14 @@ async function handleMessages(request, db, env) {
 
 // 연결 테스트
 async function handleTest(db) {
-  const isConnected = await db.testConnection();
+  const connectionTest = await db.testConnection();
+  const stats = db.getStats();
   
   return new Response(JSON.stringify({ 
     status: 'OK',
-    database: isConnected ? 'Connected' : 'Disconnected',
+    database: 'Memory-based JSON Database',
+    connection: connectionTest,
+    stats: stats,
     timestamp: new Date().toISOString()
   }), {
     headers: { 'Content-Type': 'application/json', ...corsHeaders }

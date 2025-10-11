@@ -10,9 +10,8 @@ NODE_ENV = "production"
 SIGNUP_TOKEN = "chatcoder2025secure"
 JWT_SECRET = "chatcoder-super-secret-jwt-key-2025-secure-string"
 
-# MongoDB Atlas 연결 설정
-MONGODB_URI = "mongodb+srv://CodeNameX0:Qwerty11%5E%5E@cluster0.k8t2y68.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
-MONGODB_DATABASE = "chatcoder"
+# 메모리 기반 JSON 데이터베이스 (MongoDB 불필요)
+DATABASE_TYPE = "memory"
 
 [env.production.vars]
 NODE_ENV = "production"
@@ -20,6 +19,5 @@ DOMAIN = "code-nex.store"
 SIGNUP_TOKEN = "chatcoder2025production"
 JWT_SECRET = "chatcoder-production-jwt-secret-2025-ultra-secure"
 
-# Production MongoDB Atlas 연결 설정
-MONGODB_URI = "mongodb+srv://CodeNameX0:Qwerty11%5E%5E@cluster0.k8t2y68.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
-MONGODB_DATABASE = "chatcoder"
+# Production 메모리 기반 JSON 데이터베이스
+DATABASE_TYPE = "memory"
