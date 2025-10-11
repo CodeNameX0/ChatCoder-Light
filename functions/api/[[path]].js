@@ -1,9 +1,8 @@
 // Cloudflare Pages Functions - API 엔드포인트
-// MongoDB Atlas Data API를 사용한 백엔드 API
+// 간소화된 MongoDB 연결을 사용한 백엔드 API
 
-import { CloudflareDatabase } from '../../cloudflare-database.js';
-import bcrypt from 'bcryptjs';
-import jwt from 'jsonwebtoken';
+import { CloudflareMongoClient } from '../../simple-mongo-client.js';
+import { CloudflareCrypto } from '../../cloudflare-crypto.js';
 
 // CORS 헤더 설정
 const corsHeaders = {
@@ -12,13 +11,9 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'Content-Type, Authorization',
 };
 
-// JWT 검증 함수
-function verifyToken(token, jwtSecret) {
-  try {
-    return jwt.verify(token, jwtSecret);
-  } catch (error) {
-    return null;
-  }
+// JWT 검증 함수 (Web Crypto API 사용)
+async function verifyToken(token, jwtSecret) {
+  return await CloudflareCrypto.verifyToken(token, jwtSecret);
 }
 
 export async function onRequest(context) {
@@ -35,7 +30,7 @@ export async function onRequest(context) {
   }
 
   try {
-    const db = new CloudflareDatabase(env);
+    const db = new CloudflareMongoClient(env);
     
     // API 라우팅
     switch (path) {
@@ -101,7 +96,7 @@ async function handleSignup(request, db, env) {
   }
 
   // 비밀번호 해시화
-  const hashedPassword = await bcrypt.hash(password, 10);
+  const hashedPassword = await CloudflareCrypto.hashPassword(password);
   
   // 사용자 생성
   await db.createUser(username, hashedPassword);
@@ -140,7 +135,7 @@ async function handleLogin(request, db, env) {
   }
 
   // 비밀번호 검증
-  const isValidPassword = await bcrypt.compare(password, user.password);
+  const isValidPassword = await CloudflareCrypto.verifyPassword(password, user.password);
   if (!isValidPassword) {
     return new Response(JSON.stringify({ error: '잘못된 비밀번호입니다' }), {
       status: 401,
@@ -149,10 +144,9 @@ async function handleLogin(request, db, env) {
   }
 
   // JWT 토큰 생성
-  const jwtToken = jwt.sign(
+  const jwtToken = await CloudflareCrypto.createToken(
     { username: user.username },
-    env.JWT_SECRET,
-    { expiresIn: '24h' }
+    env.JWT_SECRET
   );
 
   return new Response(JSON.stringify({ 
@@ -173,7 +167,7 @@ async function handleVerifyToken(request, env) {
   }
 
   const { token } = await request.json();
-  const decoded = verifyToken(token, env.JWT_SECRET);
+  const decoded = await verifyToken(token, env.JWT_SECRET);
   
   if (!decoded) {
     return new Response(JSON.stringify({ valid: false }), {
@@ -211,7 +205,7 @@ async function handleMessages(request, db, env) {
     }
 
     const token = authHeader.substring(7);
-    const decoded = verifyToken(token, env.JWT_SECRET);
+    const decoded = await verifyToken(token, env.JWT_SECRET);
     
     if (!decoded) {
       return new Response(JSON.stringify({ error: '유효하지 않은 토큰입니다' }), {

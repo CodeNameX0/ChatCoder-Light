@@ -7,23 +7,19 @@ name = "chatcoder-light-prod"
 
 [vars]
 NODE_ENV = "production"
-SIGNUP_TOKEN = "your-signup-token-here"
-JWT_SECRET = "your-super-secret-jwt-key"
+SIGNUP_TOKEN = "chatcoder2025secure"
+JWT_SECRET = "chatcoder-super-secret-jwt-key-2025-secure-string"
 
-# MongoDB Atlas Data API 설정
-MONGODB_DATA_API_URL = "https://data.mongodb-api.com/app/your-app-id/endpoint/data/v1"
-MONGODB_API_KEY = "your-mongodb-api-key"
-MONGODB_CLUSTER = "cluster0" 
+# MongoDB Atlas 연결 설정
+MONGODB_URI = "mongodb+srv://CodeNameX0:Qwerty11@cluster0.k8t2y68.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
 MONGODB_DATABASE = "chatcoder"
 
 [env.production.vars]
 NODE_ENV = "production"
 DOMAIN = "code-nex.store"
-SIGNUP_TOKEN = "your-production-signup-token"
-JWT_SECRET = "your-production-jwt-secret"
+SIGNUP_TOKEN = "chatcoder2025production"
+JWT_SECRET = "chatcoder-production-jwt-secret-2025-ultra-secure"
 
-# Production MongoDB Atlas Data API 설정
-MONGODB_DATA_API_URL = "https://data.mongodb-api.com/app/your-app-id/endpoint/data/v1"
-MONGODB_API_KEY = "your-production-mongodb-api-key"
-MONGODB_CLUSTER = "cluster0"
+# Production MongoDB Atlas 연결 설정
+MONGODB_URI = "mongodb+srv://CodeNameX0:Qwerty11@cluster0.k8t2y68.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
 MONGODB_DATABASE = "chatcoder"
